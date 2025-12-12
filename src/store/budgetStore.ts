@@ -62,14 +62,16 @@ export const useBudgetStore = create<BudgetState>((set, get) => ({
   // -------------------------
   // LOAD BUDGET FROM STORAGE
   // -------------------------
-  loadBudget: async () => {
+loadBudget: async () => {
     try {
-      const saved = await localforage.getItem<BudgetData>("budget");
-      if (saved) set({ budget: saved });
+        const res = await fetch("https://heroic-smile-production-6647.up.railway.app/load");
+        const data = await res.json();
+        if (data.success) set({ budget: data.data });
     } catch (err) {
-      console.error("Failed to load budget:", err);
+        console.error("Failed to load budget from server:", err);
     }
-  },
+},
+
 
   // -------------------------
   // FAKE SYNC TO SERVER (FRONTEND ASSIGNMENT)
@@ -78,7 +80,7 @@ export const useBudgetStore = create<BudgetState>((set, get) => ({
   try {
     const budget = get().budget;
 
-    const res = await fetch("http://localhost:4000/save", {
+    const res = await fetch("https://heroic-smile-production-6647.up.railway.app/save", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(budget),
