@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import SyncButton from "./SyncButton";
 import { useRouter } from "next/navigation";
+import { useAuthStore } from "@/store/authStore";
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -32,12 +33,16 @@ export default function Navbar() {
           Dashboard
         </Link>
 
-        <button
-          onClick={() => router.push("/login")}
-          className="w-full px-4 py-3 bg-red-600 text-white rounded-md font-medium"
-        >
-          Logout
-        </button>
+       <button
+  onClick={() => {
+    useAuthStore.getState().logout();  // 👈 real logout
+    router.push("/login");             // 👈 redirect
+  }}
+  className="w-full px-4 py-3 bg-red-600 text-white rounded-md font-medium"
+>
+  Logout
+</button>
+
       </div>
     </nav>
   );
