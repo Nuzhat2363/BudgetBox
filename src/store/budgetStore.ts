@@ -12,6 +12,16 @@ export interface BudgetData {
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 
+// 💡 ALWAYS SAFE DEFAULT
+const DEFAULT_BUDGET: BudgetData = {
+  income: 0,
+  bills: 0,
+  food: 0,
+  transport: 0,
+  subscriptions: 0,
+  misc: 0,
+};
+
 interface BudgetState {
   budget: BudgetData;
   isSaving: boolean;
@@ -23,35 +33,22 @@ interface BudgetState {
 }
 
 export const useBudgetStore = create<BudgetState>((set, get) => ({
-  budget: {
-    income: 0,
-    bills: 0,
-    food: 0,
-    transport: 0,
-    subscriptions: 0,
-    misc: 0,
-  },
-
+  budget: DEFAULT_BUDGET,
   isSaving: false,
-  saveStatus: "idle" as SaveStatus,
+ saveStatus: "idle" as SaveStatus,
 
-
-  // -------------------------
+  //-------------------------------------------
   // UPDATE FIELD + AUTO SAVE
-  // -------------------------
+  //-------------------------------------------
   setField: async (key, value) => {
     const updated = { ...get().budget, [key]: value };
 
-    // instant UI update
     set({ budget: updated, isSaving: true, saveStatus: "saving" });
 
     try {
       await localforage.setItem("budget", updated);
-
-      // success
       set({ isSaving: false, saveStatus: "saved" });
 
-      // hide saved after delay
       setTimeout(() => set({ saveStatus: "idle" }), 1500);
     } catch (err) {
       console.error("Failed to save budget:", err);
@@ -59,39 +56,53 @@ export const useBudgetStore = create<BudgetState>((set, get) => ({
     }
   },
 
-  // -------------------------
-  // LOAD BUDGET FROM STORAGE
-  // -------------------------
-loadBudget: async () => {
+  //-------------------------------------------
+  // LOAD BUDGET (SERVER + LOCAL FALLBACK SAFE)
+  //-------------------------------------------
+  loadBudget: async () => {
     try {
-        const res = await fetch("https://heroic-smile-production-6647.up.railway.app/load");
-        const data = await res.json();
-        if (data.success) set({ budget: data.data });
+      const res = await fetch("https://heroic-smile-production-6647.up.railway.app/load");
+      const data = await res.json();
+
+      if (data?.success && data?.data) {
+        set({ budget: { ...DEFAULT_BUDGET, ...data.data } });
+        return;
+      }
     } catch (err) {
-        console.error("Failed to load budget from server:", err);
+      console.error("Failed to load from server:", err);
     }
-},
 
+    // FALLBACK → TRY LOCALFORAGE
+    try {
+      const saved = await localforage.getItem("budget");
+      if (saved) {
+        set({ budget: { ...DEFAULT_BUDGET, ...(saved as BudgetData) } });
+        return;
+      }
+    } catch {}
 
-  // -------------------------
-  // FAKE SYNC TO SERVER (FRONTEND ASSIGNMENT)
-  // -------------------------
+    // FINAL GUARANTEE → DEFAULT
+    set({ budget: DEFAULT_BUDGET });
+  },
+
+  //-------------------------------------------
+  // SYNC TO SERVER
+  //-------------------------------------------
   syncToServer: async () => {
-  try {
-    const budget = get().budget;
+    try {
+      const budget = get().budget;
 
-    const res = await fetch("https://heroic-smile-production-6647.up.railway.app/save", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(budget),
-    });
+      const res = await fetch("https://heroic-smile-production-6647.up.railway.app/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(budget),
+      });
 
-    const data = await res.json();
-    return { success: data.success };
-  } catch (err) {
-    console.error("Sync failed:", err);
-    return { success: false };
-  }
-},
-
+      const data = await res.json();
+      return { success: data.success };
+    } catch (err) {
+      console.error("Sync failed:", err);
+      return { success: false };
+    }
+  },
 }));
